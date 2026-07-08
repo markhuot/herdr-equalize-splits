@@ -1,0 +1,18 @@
+# Copy this block into ~/.config/herdr/config.toml, then run:
+#   herdr server reload-config
+#
+# `prefix` defaults to Ctrl+b, so this binds `Ctrl+b =` to equalize every
+# split in the focused tab.
+
+[[keys.command]]
+key = "prefix+="
+type = "plugin_action"
+command = "local.equalize-splits.equalize"
+description = "equalize splits"
+
+# Optional: a dry-run binding that prints the planned ratios instead of applying.
+# [[keys.command]]
+# key = "prefix+shift+="
+# type = "plugin_action"
+# command = "local.equalize-splits.equalize-dry-run"
+# description = "equalize splits (dry run)"
