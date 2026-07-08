@@ -2,10 +2,10 @@ id = "local.equalize-splits"
 name = "Equalize Splits"
 version = "0.1.0"
 min_herdr_version = "0.7.0"
-description = "Balance every split in the current tab so each pane gets an equal share of area."
+description = "Balance every split in the current tab so each pane gets an equal share within its row/column."
 platforms = ["linux", "macos"]
 
-# Equalize all splits in the focused tab (equal area per pane).
+# Equalize all splits in the focused tab (even share within each row/column).
 [[actions]]
 id = "equalize"
 title = "Equalize splits"

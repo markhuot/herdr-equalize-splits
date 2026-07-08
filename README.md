@@ -1,6 +1,6 @@
 # herdr-equalize-splits
 
-A tiny [herdr](https://herdr.dev) plugin that balances **every split in the current tab** so each pane gets an equal share of screen area. Think tmux's `select-layout` even, or Ghostty's `equalize_splits`, but scoped to herdr's BSP tree.
+A tiny [herdr](https://herdr.dev) plugin that balances **every split in the current tab** so each pane gets an equal share within its row and column. Think tmux's `select-layout` even, or Ghostty's `equalize_splits`, but scoped to herdr's BSP tree.
 
 Bind it to `prefix+=` (i.e. `Ctrl+b =`) and one keystroke flattens whatever lopsided mess you've resized your panes into.
 
@@ -21,20 +21,24 @@ herdr models a tab as a **binary** BSP tree. Each `split` has a direction
 given to its first child). There is no three-way container — three columns are
 really `p1 | (p2 | p3)`.
 
-This plugin walks that tree and, for every split, sets
+This plugin walks that tree and, for every split, divides the space evenly among
+the columns (or rows) that divider separates:
 
 ```
-ratio = leaves(first) / (leaves(first) + leaves(second))
+ratio = slots(first) / (slots(first) + slots(second))
 ```
 
-Weighting each divider by the number of panes on each side is what makes the
-result **equal area per pane**, not just "every divider at 50%":
+A "slot" is one column or row along the split's axis. A pane is one slot, nested
+**same-axis** splits flatten into the group (so three nested columns really do
+read as three), and a **cross-axis** subtree counts as a single slot (a column
+that happens to contain stacked rows is still one column):
 
-| layout                         | result                                  |
-|--------------------------------|-----------------------------------------|
-| 3 columns `p1 \| p2 \| p3`     | 33% / 33% / 33% width                    |
-| 2 rows `p1 / p2`               | 50% top / 50% bottom                     |
-| mixed `p1 \| (p2 \| (p3 / p4))`| ~25% area each                           |
+| layout                         | result                                            |
+|--------------------------------|---------------------------------------------------|
+| 3 columns `p1 \| p2 \| p3`     | 33% / 33% / 33% width                              |
+| 2 rows `p1 / p2`               | 50% top / 50% bottom                              |
+| `p1 \| (p2 / p3)`              | 50/50 left-right; right column split 50/50 up-down |
+| quad `(p1/p3) \| (p2/p4)`      | even 2×2 grid                                      |
 
 It never splits, closes, or recreates panes — it only moves dividers via the
 `layout.set_split_ratio` socket call, so running processes are untouched.
