@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Equalize every split in the current herdr tab so each pane ends up with an
-// equal share of screen area.
+// Equalize every split in the current herdr tab so each pane gets an equal
+// share within its row/column (tmux `select-layout` even, scoped to herdr).
 //
 // How it works
 // ------------
@@ -10,13 +10,15 @@
 // splits. There is no "three-way" container — three columns are really
 // `p1 | (p2 | p3)`.
 //
-// To make N leaves equal we weight each split by the number of leaves on each
-// side: ratio = leaves(first) / (leaves(first) + leaves(second)). Applied
-// top-down this gives every leaf an equal share of its axis, which works out to
-// equal *area* per pane:
+// Each divider should split its space evenly among the columns (or rows) it
+// separates. We weight each side by its number of same-axis "slots": a pane is
+// one slot, nested same-axis splits flatten into the group, and a cross-axis
+// subtree counts as a single slot. ratio = slots(first) / slots(first+second):
 //
-//   p1 | (p2 | p3)   ->  root = 1/3, inner = 1/2   ->  33% | 33% | 33%
+//   p1 | (p2 | p3)   ->  root = 1/3, inner = 1/2   ->  33% | 33% | 33% columns
 //   p1 / p2          ->  root = 1/2                 ->  50% top / 50% bottom
+//   p1 | (p2 / p3)   ->  root = 1/2 (two columns), inner = 1/2 (two rows)
+//                        ->  50/50 left-right, right column 50/50 up-down
 //
 // We read the tree with `layout.export`, compute a target ratio + tree path for
 // every split, then push each one back with `layout.set_split_ratio`. That call
@@ -97,16 +99,26 @@ function scope() {
   return {};
 }
 
-function leafCount(node) {
-  return node.type === "pane" ? 1 : leafCount(node.first) + leafCount(node.second);
+// How many slots a node occupies along a given axis. A pane is one slot. A
+// split on the SAME axis contributes all of its slots, so three nested columns
+// read as one 3-column group. A split on the OTHER axis is a single unit — a
+// column that happens to contain stacked rows is still just one column.
+function axisSpan(node, axis) {
+  if (node.type === "pane") return 1;
+  if (node.direction === axis) {
+    return axisSpan(node.first, axis) + axisSpan(node.second, axis);
+  }
+  return 1;
 }
 
-// Walk the tree, recording a target ratio + boolean path for every split.
-// Path is read from the root: false descends into `first`, true into `second`.
+// Walk the tree, recording a target ratio + boolean path for every split. Each
+// divider splits its space evenly among the columns (or rows) it separates,
+// weighting each side by how many same-axis slots it holds. Path is read from
+// the root: false descends into `first`, true into `second`.
 function collectTargets(node, path, out) {
   if (node.type !== "split") return;
-  const first = leafCount(node.first);
-  const second = leafCount(node.second);
+  const first = axisSpan(node.first, node.direction);
+  const second = axisSpan(node.second, node.direction);
   out.push({ path: [...path], ratio: first / (first + second), first, second });
   collectTargets(node.first, [...path, false], out);
   collectTargets(node.second, [...path, true], out);
@@ -130,7 +142,7 @@ async function main() {
     for (const t of targets) {
       const where = t.path.length ? t.path.map((b) => (b ? "second" : "first")).join(">") : "root";
       process.stdout.write(
-        `  ${where}: ${t.first}:${t.second} leaves -> ratio ${t.ratio.toFixed(4)}\n`
+        `  ${where}: ${t.first}:${t.second} slots -> ratio ${t.ratio.toFixed(4)}\n`
       );
     }
     return;
